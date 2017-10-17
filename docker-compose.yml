@@ -1,0 +1,51 @@
+version: '3'
+services:
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:5.6.3
+    volumes:
+      - /var/log:/mnt/log:ro
+    links:
+      - elasticsearch
+  packetbeat:
+    image: docker.elastic.co/beats/packetbeat:5.6.3
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    network_mode: host
+    command: packetbeat -v -e -E output.elasticsearch.hosts='["localhost:9200"]'
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:5.6.3
+    environment:
+      - system.hostfs=/hostfs
+    volumes:
+      - /:/hostfs:ro
+    links:
+      - elasticsearch
+  kibana:
+    image: docker.elastic.co/kibana/kibana:5.6.3
+    ports:
+      - '5601:5601'
+    links:
+      - elasticsearch
+  dashboard_importer:
+    image: docker.elastic.co/beats/metricbeat:5.6.3
+    volumes:
+      - './import-dashboards.sh:/import-dashboards.sh'
+    entrypoint: bash
+    command: /import-dashboards.sh
+    links:
+      - elasticsearch
+  default_index_pattern_setter:
+    image: docker.elastic.co/beats/metricbeat:5.6.3
+    volumes:
+      - './set-default-index-pattern.sh:/set-default-index-pattern.sh'
+    entrypoint: bash
+    command: /set-default-index-pattern.sh
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.3
+    environment:
+      - http.host=0.0.0.0
+      - transport.host=127.0.0.1
+      - discovery.type=single-node
+    ports:
+      - '9200:9200'
